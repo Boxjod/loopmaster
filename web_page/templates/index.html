@@ -209,7 +209,7 @@ function render(){
           ${isCustom ? '<span class="stock">📝 填写需求</span>' : `<span class="stock ${p.stock<=5?'low':''}">剩 ${p.stock}</span>`}
         </div>
         <div class="row">
-          ${out ? '<span class="muted">已售罄</span>' : '<span class="tap">👆 点击选购</span>'}
+          ${out ? '<span class="muted sold-out">已售罄</span>' : '<span class="tap">👆 点击选购</span>'}
         </div>
       </div>`;
     });
