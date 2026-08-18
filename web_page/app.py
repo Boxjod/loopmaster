@@ -376,7 +376,10 @@ def api_login():
 @app.route("/api/products")
 def api_products():
     db = get_db()
-    rows = db.execute("SELECT * FROM products ORDER BY category DESC, id").fetchall()
+    rows = db.execute(
+        "SELECT * FROM products "
+        "ORDER BY CASE WHEN stock > 0 THEN 0 ELSE 1 END, category DESC, id"
+    ).fetchall()
     return jsonify(ok=True, products=[dict(r) for r in rows])
 
 
