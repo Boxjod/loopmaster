@@ -71,8 +71,8 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 # 字段顺序：(中文名, 英文名 name_en, 分类, 售价, 库存, emoji)
 # 字段顺序：(中文名, 英文名 name_en, 分类, 售价, 库存, emoji, 图片文件名@static/assets/)
 SEED_PRODUCTS = [
-    ("农夫山泉矿泉水", "bottled_water",  "饮料",   2.0, 30, "💧", "bottled_water.jpg"),
-    ("纯牛奶",        "milk",           "饮料",   5.0, 15, "🥛", "milk.jpg"),
+    ("农夫山泉矿泉水", "bottled_water",  "饮料",   2.0, 0,  "💧", "bottled_water.jpg"),
+    ("纯牛奶",        "milk",           "饮料",   5.0, 0,  "🥛", "milk.jpg"),
     ("双汇火腿肠",    "ham_sausage",    "零食",   2.0, 25, "🌭", "ham_sausage.jpg"),
     ("干脆面",        "cracker_noodle", "零食",   3.0, 0,  "🍜", "cracker_noodle.jpg"),
     ("旺仔小馒头",    "wangzai_bun",    "零食",   4.0, 18, "🍘", "wangzai_bun.jpg"),
@@ -89,12 +89,20 @@ SEED_PRODUCTS = [
 # 已从货架下架的 SKU。启动时同步清理旧数据库，避免只改种子数据后仍继续展示。
 RETIRED_PRODUCT_SKUS = ("cola", "red_bull")
 # 只执行一次的库存迁移：让已有数据库同步为缺货，之后后台仍可正常补货。
-OUT_OF_STOCK_MIGRATION_KEY = "catalog_out_of_stock_20260819"
-OUT_OF_STOCK_SKUS = (
-    "cracker_noodle",
-    "chocolate_bar",
-    "mung_bean_cake",
-    "cheese_biscuit",
+OUT_OF_STOCK_MIGRATIONS = (
+    (
+        "catalog_out_of_stock_20260819",
+        (
+            "cracker_noodle",
+            "chocolate_bar",
+            "mung_bean_cake",
+            "cheese_biscuit",
+        ),
+    ),
+    (
+        "catalog_out_of_stock_milk_water_20260819",
+        ("milk", "bottled_water"),
+    ),
 )
 # 分类中英映射（发给 agent / 存英文用）
 CATEGORY_EN = {"饮料": "drink", "零食": "snack", "自定义": "custom"}
@@ -240,19 +248,22 @@ def init_db():
         "UPDATE products SET image = ? WHERE name_en = ? AND COALESCE(image, '') = ''",
         [(img, en) for (_n, en, _c, _p, _s, _e, img) in SEED_PRODUCTS if img],
     )
-    migrated = db.execute(
-        "SELECT 1 FROM stats WHERE key = ?",
-        (OUT_OF_STOCK_MIGRATION_KEY,),
-    ).fetchone()
-    if not migrated:
-        placeholders = ",".join("?" for _ in OUT_OF_STOCK_SKUS)
+    for migration_key, skus in OUT_OF_STOCK_MIGRATIONS:
+        migrated = db.execute(
+            "SELECT 1 FROM stats WHERE key = ?",
+            (migration_key,),
+        ).fetchone()
+        if migrated:
+            continue
+
+        placeholders = ",".join("?" for _ in skus)
         db.execute(
             f"UPDATE products SET stock = 0 WHERE name_en IN ({placeholders})",
-            OUT_OF_STOCK_SKUS,
+            skus,
         )
         db.execute(
             "INSERT INTO stats(key, value) VALUES(?, 1)",
-            (OUT_OF_STOCK_MIGRATION_KEY,),
+            (migration_key,),
         )
     db.commit()
     db.close()
