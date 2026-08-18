@@ -73,9 +73,9 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 SEED_PRODUCTS = [
     ("农夫山泉矿泉水", "bottled_water",  "饮料",   2.0, 0,  "💧", "bottled_water.jpg"),
     ("纯牛奶",        "milk",           "饮料",   5.0, 0,  "🥛", "milk.jpg"),
-    ("双汇火腿肠",    "ham_sausage",    "零食",   2.0, 25, "🌭", "ham_sausage.jpg"),
+    ("双汇火腿肠",    "ham_sausage",    "零食",   2.0, 0,  "🌭", "ham_sausage.jpg"),
     ("干脆面",        "cracker_noodle", "零食",   3.0, 0,  "🍜", "cracker_noodle.jpg"),
-    ("旺仔小馒头",    "wangzai_bun",    "零食",   4.0, 18, "🍘", "wangzai_bun.jpg"),
+    ("旺仔小馒头",    "wangzai_bun",    "零食",   4.0, 0,  "🍘", "wangzai_bun.jpg"),
     ("绿豆饼",        "mung_bean_cake", "零食",   3.0, 0,  "🥮", "mung_bean_cake.jpg"),
     ("芝士夹心饼干",  "cheese_biscuit", "零食",   5.0, 0,  "🧀", "cheese_biscuit.jpg"),
     ("巧克力棒",      "chocolate_bar",  "零食",   6.0, 0,  "🍫", "chocolate_bar.jpg"),
@@ -102,6 +102,10 @@ OUT_OF_STOCK_MIGRATIONS = (
     (
         "catalog_out_of_stock_milk_water_20260819",
         ("milk", "bottled_water"),
+    ),
+    (
+        "catalog_out_of_stock_sausage_bun_20260819",
+        ("ham_sausage", "wangzai_bun"),
     ),
 )
 # 分类中英映射（发给 agent / 存英文用）
