@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-麦西 Messi · 双臂销售机器人 自助售卖下单后端
+LoopMaster · 自进化学习具身系统后端
 Flask + SQLite，零额外依赖之外只需 flask。
 
 功能：
@@ -71,8 +71,6 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 # 字段顺序：(中文名, 英文名 name_en, 分类, 售价, 库存, emoji)
 # 字段顺序：(中文名, 英文名 name_en, 分类, 售价, 库存, emoji, 图片文件名@static/assets/)
 SEED_PRODUCTS = [
-    ("可口可乐",      "cola",           "饮料",   3.0, 20, "🥤", "cola.jpg"),
-    ("易拉罐装红牛",  "red_bull",       "饮料",   6.0, 15, "🐂", "red_bull.jpg"),
     ("农夫山泉矿泉水", "bottled_water",  "饮料",   2.0, 30, "💧", "bottled_water.jpg"),
     ("纯牛奶",        "milk",           "饮料",   5.0, 15, "🥛", "milk.jpg"),
     ("双汇火腿肠",    "ham_sausage",    "零食",   2.0, 25, "🌭", "ham_sausage.jpg"),
@@ -81,8 +79,15 @@ SEED_PRODUCTS = [
     ("绿豆饼",        "mung_bean_cake", "零食",   3.0, 18, "🥮", "mung_bean_cake.jpg"),
     ("芝士夹心饼干",  "cheese_biscuit", "零食",   5.0, 18, "🧀", "cheese_biscuit.jpg"),
     ("巧克力棒",      "chocolate_bar",  "零食",   6.0, 15, "🍫", "chocolate_bar.jpg"),
+    ("麻辣王子辣条",  "spicy_gluten_strip", "零食", 3.0, 20, "🌶️", "麻辣王子辣条.jpg"),
+    ("LoopMaster 矿泉水", "loopmaster_water", "饮料", 2.0, 30, "💧", "矿泉水.jpg"),
+    ("AD钙牛奶",      "ad_calcium_milk", "饮料",  3.0, 20, "🥛", "AD钙牛奶.jpg"),
+    ("蛋糕面包",      "cake_bread",     "零食",   4.0, 18, "🍰", "蛋糕面包.jpg"),
+    ("奥利奥饼干",    "oreo_cookie",    "零食",   5.0, 20, "🍪", "奥利奥饼干.jpg"),
     ("自定义",        "custom",         "自定义", 0.0, 99, "✨", ""),
 ]
+# 已从货架下架的 SKU。启动时同步清理旧数据库，避免只改种子数据后仍继续展示。
+RETIRED_PRODUCT_SKUS = ("cola", "red_bull")
 # 分类中英映射（发给 agent / 存英文用）
 CATEGORY_EN = {"饮料": "drink", "零食": "snack", "自定义": "custom"}
 
@@ -207,20 +212,26 @@ def init_db():
     if "image" not in cols:
         db.execute("ALTER TABLE products ADD COLUMN image TEXT NOT NULL DEFAULT ''")
 
-    # 初始/重置商品仓库：新仓库的 SKU 不全在库、或已入库商品还没图，就清空重灌为 SEED_PRODUCTS
+    db.executemany(
+        "DELETE FROM products WHERE name_en = ?",
+        [(sku,) for sku in RETIRED_PRODUCT_SKUS],
+    )
+
+    # 增量同步种子商品：只补充缺失 SKU，并为旧商品补图，保留实时库存、商品 ID 和后台新增商品。
     rows = db.execute("SELECT name_en, image FROM products").fetchall()
     have = {r[0] for r in rows}
-    want = {en for (_n, en, _c, _p, _s, _e, _img) in SEED_PRODUCTS}
-    need_img = any((not r[1]) for r in rows if r[0] and r[0] != "custom")
-    if (not want.issubset(have)) or need_img:
-        db.execute("DELETE FROM products")
-        db.execute("DELETE FROM sqlite_sequence WHERE name='products'")
-        ts = now_str()
+    ts = now_str()
+    missing = [product for product in SEED_PRODUCTS if product[1] not in have]
+    if missing:
         db.executemany(
             "INSERT INTO products(name,name_en,category,price,stock,emoji,image,created_at) "
             "VALUES(?,?,?,?,?,?,?,?)",
-            [(n, en, c, p, s, e, img, ts) for (n, en, c, p, s, e, img) in SEED_PRODUCTS],
+            [(n, en, c, p, s, e, img, ts) for (n, en, c, p, s, e, img) in missing],
         )
+    db.executemany(
+        "UPDATE products SET image = ? WHERE name_en = ? AND COALESCE(image, '') = ''",
+        [(img, en) for (_n, en, _c, _p, _s, _e, img) in SEED_PRODUCTS if img],
+    )
     db.commit()
     db.close()
 
@@ -1371,9 +1382,8 @@ if __name__ == "__main__":
     if snap:
         print("  启动快照:", os.path.basename(snap))
     print("=" * 48)
-    print("  麦西 Messi · 双臂销售机器人售卖系统")
+    print("  LoopMaster · 自进化学习具身系统")
     print("  下单页 : http://127.0.0.1:5000/")
-    print("  数据后台: http://127.0.0.1:5000/dashboard")
     print("  智能体页: http://127.0.0.1:5000/loopviz")
     print("=" * 48)
     app.run(host="0.0.0.0", port=5000, debug=True)
