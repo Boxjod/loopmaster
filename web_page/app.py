@@ -73,18 +73,18 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 SEED_PRODUCTS = [
     ("农夫山泉矿泉水", "bottled_water",  "饮料",   2.0, 0,  "💧", "bottled_water.jpg"),
     ("纯牛奶",        "milk",           "饮料",   5.0, 0,  "🥛", "milk.jpg"),
-    ("双汇火腿肠",    "ham_sausage",    "零食",   2.0, 0,  "🌭", "ham_sausage.jpg"),
+    ("双汇火腿肠",    "ham_sausage",    "零食",   2.0, 100, "🌭", "ham_sausage.jpg"),
     ("干脆面",        "cracker_noodle", "零食",   3.0, 0,  "🍜", "cracker_noodle.jpg"),
     ("旺仔小馒头",    "wangzai_bun",    "零食",   4.0, 0,  "🍘", "wangzai_bun.jpg"),
     ("绿豆饼",        "mung_bean_cake", "零食",   3.0, 0,  "🥮", "mung_bean_cake.jpg"),
     ("芝士夹心饼干",  "cheese_biscuit", "零食",   5.0, 0,  "🧀", "cheese_biscuit.jpg"),
     ("巧克力棒",      "chocolate_bar",  "零食",   6.0, 0,  "🍫", "chocolate_bar.jpg"),
-    ("麻辣王子辣条",  "spicy_gluten_strip", "零食", 3.0, 20, "🌶️", "麻辣王子辣条.jpg"),
-    ("LoopMaster 矿泉水", "loopmaster_water", "饮料", 2.0, 30, "💧", "矿泉水.jpg"),
-    ("AD钙牛奶",      "ad_calcium_milk", "饮料",  3.0, 20, "🥛", "AD钙牛奶.jpg"),
-    ("蛋糕面包",      "cake_bread",     "零食",   4.0, 18, "🍰", "蛋糕面包.jpg"),
-    ("奥利奥饼干",    "oreo_cookie",    "零食",   5.0, 20, "🍪", "奥利奥饼干.jpg"),
-    ("自定义",        "custom",         "自定义", 0.0, 99, "✨", ""),
+    ("麻辣王子辣条",  "spicy_gluten_strip", "零食", 3.0, 100, "🌶️", "麻辣王子辣条.jpg"),
+    ("LoopMaster 矿泉水", "loopmaster_water", "饮料", 2.0, 100, "💧", "矿泉水.jpg"),
+    ("AD钙牛奶",      "ad_calcium_milk", "饮料",  3.0, 100, "🥛", "AD钙牛奶.jpg"),
+    ("蛋糕面包",      "cake_bread",     "零食",   4.0, 100, "🍰", "蛋糕面包.jpg"),
+    ("奥利奥饼干",    "oreo_cookie",    "零食",   5.0, 100, "🍪", "奥利奥饼干.jpg"),
+    ("自定义",        "custom",         "自定义", 0.0, 100, "✨", ""),
 ]
 # 已从货架下架的 SKU。启动时同步清理旧数据库，避免只改种子数据后仍继续展示。
 RETIRED_PRODUCT_SKUS = ("cola", "red_bull")
@@ -106,6 +106,22 @@ OUT_OF_STOCK_MIGRATIONS = (
     (
         "catalog_out_of_stock_sausage_bun_20260819",
         ("ham_sausage", "wangzai_bun"),
+    ),
+)
+# 只执行一次的补货迁移：同步线上旧数据库，保留售罄商品和全部业务数据。
+RESTOCK_MIGRATIONS = (
+    (
+        "catalog_restock_available_100_20260819",
+        (
+            "ham_sausage",
+            "spicy_gluten_strip",
+            "loopmaster_water",
+            "ad_calcium_milk",
+            "cake_bread",
+            "oreo_cookie",
+            "custom",
+        ),
+        100,
     ),
 )
 # 分类中英映射（发给 agent / 存英文用）
@@ -264,6 +280,23 @@ def init_db():
         db.execute(
             f"UPDATE products SET stock = 0 WHERE name_en IN ({placeholders})",
             skus,
+        )
+        db.execute(
+            "INSERT INTO stats(key, value) VALUES(?, 1)",
+            (migration_key,),
+        )
+    for migration_key, skus, stock in RESTOCK_MIGRATIONS:
+        migrated = db.execute(
+            "SELECT 1 FROM stats WHERE key = ?",
+            (migration_key,),
+        ).fetchone()
+        if migrated:
+            continue
+
+        placeholders = ",".join("?" for _ in skus)
+        db.execute(
+            f"UPDATE products SET stock = ? WHERE name_en IN ({placeholders})",
+            (stock, *skus),
         )
         db.execute(
             "INSERT INTO stats(key, value) VALUES(?, 1)",
